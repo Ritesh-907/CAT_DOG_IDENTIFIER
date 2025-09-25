@@ -1,50 +1,49 @@
-from flask import Flask, render_template, request, jsonify
-import os
+from flask import Flask, request, jsonify, render_template
+import tensorflow as tf
+from tensorflow.keras.preprocessing import image
 import numpy as np
-from tensorflow.keras.models import load_model
-from PIL import Image
+import os
 
 app = Flask(__name__)
 
-# Load your trained model
-model = load_model("cat_dog_mobilenet.h5")
+# Load trained MobileNet model
+MODEL_PATH = "cat_dog_mobilenet.h5"
+model = tf.keras.models.load_model(MODEL_PATH)
 
-@app.route("/")
+# Prediction function
+def predict_image(img_path):
+    try:
+        img = image.load_img(img_path, target_size=(224, 224))  # MobileNet expects 224x224
+        img_array = image.img_to_array(img) / 255.0
+        img_array = np.expand_dims(img_array, axis=0)
+
+        prediction = model.predict(img_array)[0][0]
+        return "Dog 🐶" if prediction > 0.5 else "Cat 🐱"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+@app.route("/", methods=["GET"])
 def index():
     return render_template("index.html")
 
 @app.route("/predict", methods=["POST"])
-def predict():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file uploaded'})
+def upload():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"})
 
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'})
+    file = request.files["file"]
 
     # Save uploaded file temporarily
-    filepath = os.path.join("static", file.filename)
+    upload_folder = "static/uploads"
+    os.makedirs(upload_folder, exist_ok=True)
+    filepath = os.path.join(upload_folder, file.filename)
     file.save(filepath)
 
-    # Preprocess image
-    img = Image.open(filepath).convert("RGB").resize((224, 224))
-    img_array = np.expand_dims(np.array(img) / 255.0, axis=0)
+    # Run prediction
+    result = predict_image(filepath)
 
-    # Predict
-    prediction = model.predict(img_array)[0][0]  # sigmoid output
-    confidence = prediction if prediction >= 0.5 else 1 - prediction
-
-    # Stricter threshold
-    threshold = 0.80  # 80% required
-    if confidence < threshold:
-        label = "❓ Neither Cat nor Dog"
-    else:
-        label = "🐱 Cat" if prediction < 0.5 else "🐶 Dog"
-
-    return jsonify({
-        'label': label,
-        'confidence': float(confidence * 100)
-    })
+    return jsonify({"prediction": result})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # For Render: host must be 0.0.0.0
+    app.run(host="0.0.0.0", port=5000)
