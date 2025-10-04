@@ -28,21 +28,29 @@ def index():
 
 @app.route("/predict", methods=["POST"])
 def upload():
-    if "file" not in request.files:
-        return jsonify({"error": "No file uploaded"})
+    try:
+        if "file" not in request.files:
+            return jsonify({"error": "No file uploaded"})
 
-    file = request.files["file"]
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"error": "No file selected"})
 
-    # Save uploaded file temporarily
-    upload_folder = "static/uploads"
-    os.makedirs(upload_folder, exist_ok=True)
-    filepath = os.path.join(upload_folder, file.filename)
-    file.save(filepath)
+        # Save uploaded file
+        upload_folder = os.path.join("static", "uploads")
+        os.makedirs(upload_folder, exist_ok=True)
+        filepath = os.path.join(upload_folder, file.filename)
+        file.save(filepath)
 
-    # Run prediction
-    result = predict_image(filepath)
+        # Run prediction
+        result = predict_image(filepath)
 
-    return jsonify({"prediction": result})
+        return jsonify({"prediction": result})
+
+    except Exception as e:
+        # Always return JSON, never HTML
+        return jsonify({"error": str(e)})
+
 
 if __name__ == "__main__":
     import os
