@@ -1,5 +1,5 @@
-Flask
-gunicorn
+flask
 tensorflow
+gunicorn
 pillow
 numpy
